@@ -9,6 +9,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument("-l","--lldp",nargs="?",help="Check LLDP status")
 parser.add_argument("-m","--mlag",nargs="?",help="Check MLAG status")
 parser.add_argument("-mi","--mlagint",nargs="?",help="Check MLAG Interface status")
+parser.add_argument("-b","--bgp",nargs="?",help="Check BGP status")
 args=parser.parse_args()
 
 def read_file(file_name):
@@ -45,7 +46,6 @@ def file_finder(file_name):
 def check_mlagint(file_name):
  data=read_file(file_name)
  mi=[]
-#print len(data)
  regexp = re.compile('mlag.*state.*oper.*changes')
  for i in data:
   if regexp.search(i):
@@ -58,6 +58,43 @@ def check_mlagint(file_name):
  print('\n')
  print tabulate(mi, headers=['MLAG', 'State','Local','Remote','Oper[Local/Remote]','Config[Local/Remote]','Last Change','Changes'],tablefmt='fancy_grid')
  print('\n')  
+def check_bgp(file_name):
+ data=read_file(file_name)
+ bgp=[]
+ rid=asnum=''
+ ######COME UP WITH A BETTER REGEX;figure out why \b(\d+\.)+\d+\b not working########
+ re_rid='\d+\.\d+\.\d+\.\d'
+ re_as='\d+$'
+ regexp = re.compile('------------- show ip bgp summary vrf all -------------')
+ for i in data:
+  if regexp.search(i):
+    index=data.index(i)+2
+ for i in range(index,index+200):
+  if data[i].isspace():
+   break
+  else:
+   if 'VRF' in data[i]:
+    vrf= data[i].split()[-1]
+   if 'identifier' in data[i]:
+    rid=re.findall(re_rid,data[i])
+    asnum=re.findall(re_as,data[i])
+   regexp = re.compile('Neighbor.*AS.*State.*PfxAcc')
+   if regexp.search(data[i]):
+    index=i+2
+    for j in range(index,index+200):
+     if 'VRF' in data[j]:
+      break
+     if data[j].isspace():
+      break
+     else:
+      bgp.append(data[j].split('       '))
+ 
+ for i in bgp:
+  print i
+
+ #print('\n')
+ #print tabulate(mi, headers=['MLAG', 'State','Local','Remote','Oper[Local/Remote]','Config[Local/Remote]','Last Change','Changes'],tablefmt='fancy_grid')
+ #print('\n')
 def check_mlag(file_name):
  mlag=[]
  lif=''
@@ -130,6 +167,9 @@ def main():
  if args.mlagint:
   file=file_finder(args.mlagint)
   check_mlagint(file)
+ if args.bgp:
+  file=file_finder(args.bgp)
+  check_bgp(file)
 if __name__=='__main__':
  main()
 
