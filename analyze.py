@@ -61,6 +61,8 @@ def check_mlagint(file_name):
 def check_bgp(file_name):
  data=read_file(file_name)
  bgp=[]
+ temp=[]
+ index_val=0
  rid=asnum=''
  ######COME UP WITH A BETTER REGEX;figure out why \b(\d+\.)+\d+\b not working########
  re_rid='\d+\.\d+\.\d+\.\d'
@@ -76,21 +78,43 @@ def check_bgp(file_name):
    if 'VRF' in data[i]:
     vrf= data[i].split()[-1]
    if 'identifier' in data[i]:
-    rid=re.findall(re_rid,data[i])
+    rid=re.findall(re_rid,data[i])[0]
     asnum=re.findall(re_as,data[i])
    regexp = re.compile('Neighbor.*AS.*State.*PfxAcc')
    if regexp.search(data[i]):
-    index=i+2
-    for j in range(index,index+200):
+    index_val=i+1
+ #print data[index_val]
+    for j in range(index_val,index_val+200):
      if 'VRF' in data[j]:
+      if len(bgp)>0:
+       for i in bgp:
+        temp.append(filter(None,i))
+      else:
+        print('\nNO BGP NEI for the VRF '+ vrf+'with RID' + rid) 
+          
+      print tabulate(temp, headers=['Neighbor', 'V','AS','MsgRcvd','MsgSent','InQ','OutQ','Up/Down','State' ,'PfxRcd','PfxAcc','VRF','RID'],tablefmt='fancy_grid')
+      bgp=[] 
+      temp=[]
       break
      if data[j].isspace():
+      if len(bgp)>0:
+       for i in bgp:
+        temp.append(filter(None,i))
+      else:    
+       print('NO BGP NEI for the VRF '+ vrf+'with RID' + rid) 
+      print tabulate(temp, headers=['Neighbor', 'V','AS','MsgRcvd','MsgSent','InQ','OutQ','Up/Down','State' ,'PfxRcd','PfxAcc','VRF','RID'],tablefmt='fancy_grid')
+      bgp=[] 
+      temp=[]
+      bgp=[] 
       break
      else:
-      bgp.append(data[j].split('       '))
+      data[j]=data[j]+' '+vrf
+      data[j]=data[j]+' '+rid
+      bgp.append(data[j].split(' '))
+
  
- for i in bgp:
-  print i
+ #for i in bgp:
+ # print filter(None,i)
 
  #print('\n')
  #print tabulate(mi, headers=['MLAG', 'State','Local','Remote','Oper[Local/Remote]','Config[Local/Remote]','Last Change','Changes'],tablefmt='fancy_grid')
