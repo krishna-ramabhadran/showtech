@@ -10,6 +10,8 @@ parser.add_argument("-l","--lldp",nargs="?",help="Check LLDP status")
 parser.add_argument("-m","--mlag",nargs="?",help="Check MLAG status")
 parser.add_argument("-mi","--mlagint",nargs="?",help="Check MLAG Interface status")
 parser.add_argument("-b","--bgp",nargs="?",help="Check BGP status")
+parser.add_argument("-o","--ospf",nargs="?",help="Check OSPF status")
+parser.add_argument("-v","--version",nargs="?",help="Check Version")
 args=parser.parse_args()
 
 def read_file(file_name):
@@ -43,6 +45,7 @@ def file_finder(file_name):
   if ' ' in file_name:
    file_name="'"+file_name+"'"
   return file_name
+
 def check_mlagint(file_name):
  data=read_file(file_name)
  mi=[]
@@ -58,6 +61,8 @@ def check_mlagint(file_name):
  print('\n')
  print tabulate(mi, headers=['MLAG', 'State','Local','Remote','Oper[Local/Remote]','Config[Local/Remote]','Last Change','Changes'],tablefmt='fancy_grid')
  print('\n')  
+
+
 def check_bgp(file_name):
  data=read_file(file_name)
  bgp=[]
@@ -111,14 +116,42 @@ def check_bgp(file_name):
       data[j]=data[j]+' '+vrf
       data[j]=data[j]+' '+rid
       bgp.append(data[j].split(' '))
-
+def check_ver(file_name):
+ ver=temp=[]   
+ data=read_file(file_name)
+ regexp = re.compile('------------- show version detail -------------')
+ for i in data:
+  if regexp.search(i):
+    index=data.index(i)+1
+ for i in range(index,index+100):
+  if 'Installed software packages' in data[i]:
+   ver.append(temp)
+   break
+  else:
+   temp.append(data[i])
+   print data[i]   
+########TABULATE IS NOT WORKING;FIX IT TO GET THE OUTPUT FORMATTING!!#####
+ #header=['Show Version']
+ #print("\n")
+ #print tabulate(ver,headers=header,tablefmt='fancy_grid')
+ #print('\n')
  
- #for i in bgp:
- # print filter(None,i)
-
- #print('\n')
- #print tabulate(mi, headers=['MLAG', 'State','Local','Remote','Oper[Local/Remote]','Config[Local/Remote]','Last Change','Changes'],tablefmt='fancy_grid')
- #print('\n')
+def check_ospf(file_name):
+ ospf=[]
+ data=read_file(file_name)
+ regexp = re.compile('------------- show ip ospf neighbor -------------')
+ for i in data:
+  if regexp.search(i):
+    index=data.index(i)+3
+ for i in range(index,index+200):
+  if data[i].isspace():
+   break
+  else:
+    ospf.append(filter(None,data[i].split(' ')))
+ header=['Neighbor ID','VRF','Pri','State','Dead Time','Address','Interface']    
+ print("\n")
+ print tabulate(ospf,headers=header,tablefmt='fancy_grid')
+ print('\n')
 def check_mlag(file_name):
  mlag=[]
  lif=''
@@ -126,6 +159,7 @@ def check_mlag(file_name):
  did=''
  check='cat '+file_name+'  | grep -e \'MLAG Configuration:\' -A 30'
  data=os.popen(check).readlines()
+ #######EDIT THE CODE BELOW;COME UP WITH SOMETHING BETTER##########
  for i in data:
   if 'domain-id' in i:
    did=i.split(':')[1].strip(' ').strip('\n')
@@ -194,6 +228,12 @@ def main():
  if args.bgp:
   file=file_finder(args.bgp)
   check_bgp(file)
+ if args.ospf:
+  file=file_finder(args.ospf)
+  check_ospf(file)  
+ if args.version:
+  file=file_finder(args.version)
+  check_ver(file)
 if __name__=='__main__':
  main()
 
