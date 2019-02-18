@@ -12,6 +12,8 @@ parser.add_argument("-mi","--mlagint",nargs="?",help="Check MLAG Interface statu
 parser.add_argument("-b","--bgp",nargs="?",help="Check BGP status")
 parser.add_argument("-o","--ospf",nargs="?",help="Check OSPF status")
 parser.add_argument("-v","--version",nargs="?",help="Check Version")
+parser.add_argument("-p","--phy",nargs="*",help="Check Phy Details")
+parser.add_argument("-i","--input",nargs="?",help="Specify input file for parsing")
 args=parser.parse_args()
 
 def read_file(file_name):
@@ -88,7 +90,6 @@ def check_bgp(file_name):
    regexp = re.compile('Neighbor.*AS.*State.*PfxAcc')
    if regexp.search(data[i]):
     index_val=i+1
- #print data[index_val]
     for j in range(index_val,index_val+200):
      if 'VRF' in data[j]:
       if len(bgp)>0:
@@ -113,6 +114,7 @@ def check_bgp(file_name):
       bgp=[] 
       break
      else:
+##############LOGIC ERROR WHEN THERE ARE NOT ESTABLISED CONNECTIONS;POSITION OF VRF AND RID IS WRONG IN PRINT;;FIX IT-WORKAOROUND - INSERT VLAUES AT LAST 2 POSITION AFTER COUNTING######################         
       data[j]=data[j]+' '+vrf
       data[j]=data[j]+' '+rid
       bgp.append(data[j].split(' '))
@@ -128,13 +130,12 @@ def check_ver(file_name):
    ver.append(temp)
    break
   else:
-   temp.append(data[i])
-   print data[i]   
-########TABULATE IS NOT WORKING;FIX IT TO GET THE OUTPUT FORMATTING!!#####
- #header=['Show Version']
- #print("\n")
- #print tabulate(ver,headers=header,tablefmt='fancy_grid')
- #print('\n')
+   if not data[i].isspace():   
+    temp.append([data[i].strip('\n').strip('\r')])
+ header=['*********************************SHOW VESION*********************************']
+ print("\n")
+ print tabulate(ver,headers=header,tablefmt='fancy_grid')
+ print('\n')
  
 def check_ospf(file_name):
  ospf=[]
@@ -152,6 +153,44 @@ def check_ospf(file_name):
  print("\n")
  print tabulate(ospf,headers=header,tablefmt='fancy_grid')
  print('\n')
+
+
+def check_phy(*args):
+ phy=[]
+ flag=0
+ if len(args)>1:
+  data=read_file(args[1])
+  flag=1
+ else:
+  data=read_file(args[0])   
+ regexp = re.compile('------------- show interfaces phy detail -------------')
+ for i in data:
+  if regexp.search(i):
+   index=data.index(i)
+ for i in range(index,index+2000):
+  if flag:
+   header='****************************************************************** Phy Details:'+args[0]+' ******************************************************************'   
+   if 'thernet' not in args[0]:
+     value=args[0].replace('t','thernet').capitalize()
+     value=args[0].replace('th','thernet').capitalize()  
+     print value  
+   regexp = re.compile(value)  
+   if regexp.search(data[i]):
+    #print(data[i])    
+    #phy.append([data[i].strip('\n').strip('\r')])
+    for i in range(i+1,i+100):
+     if 'Ethernet' in data[i]:
+      os.system('clear')   
+      print tabulate(phy,headers=[header],tablefmt='fancy_grid')
+      sys.exit(-2)
+     else:
+      phy.append([data[i].strip('\n').strip('\r')])
+  else:
+   #while not data[i].isspace():
+    #print data[i]   
+    #i=i+1
+    print('\nPlease check the PHY details for specific interface by specifying the interface name.\n')
+    sys.exit(-2)
 def check_mlag(file_name):
  mlag=[]
  lif=''
@@ -234,6 +273,13 @@ def main():
  if args.version:
   file=file_finder(args.version)
   check_ver(file)
+ if args.phy:
+  if len(args.phy) > 1:   
+   file=file_finder(args.phy[1])
+   check_phy(args.phy[0],file)  
+  else:
+   file=file_finder(args.phy[0])
+   check_phy(file)
 if __name__=='__main__':
  main()
 
