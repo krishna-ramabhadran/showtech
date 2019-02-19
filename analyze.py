@@ -13,7 +13,7 @@ parser.add_argument("-b","--bgp",nargs="?",help="Check BGP status")
 parser.add_argument("-o","--ospf",nargs="?",help="Check OSPF status")
 parser.add_argument("-v","--version",nargs="?",help="Check Version")
 parser.add_argument("-p","--phy",nargs="*",help="Check Phy Details")
-parser.add_argument("-i","--input",nargs="?",help="Specify input file for parsing")
+parser.add_argument("-i","--int",nargs="*",help="Check Interface Details")
 args=parser.parse_args()
 
 def read_file(file_name):
@@ -107,7 +107,7 @@ def check_bgp(file_name):
        for i in bgp:
         temp.append(filter(None,i))
       else:    
-       print('NO BGP NEI for the VRF '+ vrf+'with RID' + rid) 
+       print('NO BGP NEI for the VRF '+ vrf+' with RID' + rid) 
       print tabulate(temp, headers=['Neighbor', 'V','AS','MsgRcvd','MsgSent','InQ','OutQ','Up/Down','State' ,'PfxRcd','PfxAcc','VRF','RID'],tablefmt='fancy_grid')
       bgp=[] 
       temp=[]
@@ -173,7 +173,6 @@ def check_phy(*args):
    if 'thernet' not in args[0]:
      value=args[0].replace('t','thernet').capitalize()
      value=args[0].replace('th','thernet').capitalize()  
-     print value  
    regexp = re.compile(value)  
    if regexp.search(data[i]):
     #print(data[i])    
@@ -191,6 +190,43 @@ def check_phy(*args):
     #i=i+1
     print('\nPlease check the PHY details for specific interface by specifying the interface name.\n')
     sys.exit(-2)
+def check_int(*args):
+ int=[]
+ flag=0
+ if len(args)>1:
+  data=read_file(args[1])
+  flag=1
+ else:
+  data=read_file(args[0])
+ regexp = re.compile('------------- show interfaces -------------')
+ for i in data:
+  if regexp.search(i):
+   index=data.index(i)
+ for i in range(index,index+2000):
+  if flag:
+   header='****************************************************************** Interface Details:'+args[0]+' ******************************************************************'
+   if 'thernet' not in args[0]:
+     #value=args[0].replace('t','thernet').capitalize()+' is'
+     value=args[0].replace('th','thernet').capitalize()+' is'
+   else:
+    value=args[0].capitalize()+' is'   
+   regexp = re.compile(value)
+   if regexp.search(data[i]):
+    int.append([data[i].strip('\n').strip('\r')])
+    for i in range(i+1,i+100):
+     if 'Ethernet'  and 'line protocol' in data[i]:
+      os.system('clear')
+      print tabulate(int,headers=[header],tablefmt='fancy_grid')
+      sys.exit(-2)
+     else:
+      int.append([data[i].strip('\n').strip('\r')])
+  else:
+   #while not data[i].isspace():
+    #print data[i]
+    #i=i+1
+    print('\nPlease check the interface  details for specific interface by specifying the interface name. Eg: analyze.py -i et1/1 showtech.txt. Interface short name will work! \n')
+    sys.exit(-2) 
+
 def check_mlag(file_name):
  mlag=[]
  lif=''
@@ -280,6 +316,13 @@ def main():
   else:
    file=file_finder(args.phy[0])
    check_phy(file)
+ if args.int:
+  if len(args.int) > 1:
+   file=file_finder(args.int[1])
+   check_int(args.int[0],file)
+  else:
+   file=file_finder(args.int[0])
+   check_int(file)  
 if __name__=='__main__':
  main()
 
