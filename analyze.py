@@ -27,10 +27,13 @@ def read_file(file_name):
 # a=data.index(i)  if regexp.search(i) and a==0 else 0
 # print a
 
-#THIS IS NOT USED NOW!#
-#def phy_int_list():
-# phy_int_list=os.popen('cat 137753-show-tech-AU-SYD-SY3-7280-CORE01-02_01.1343  | egrep Et.*LLDP | cut -d " "  -f2 ').readlines()
-#return phy_int_list
+def phy_int_list(file_name):
+ check='cat '+file_name+'  | egrep Et.*LLDP | cut -d " "  -f2 '
+ phy_int_list=os.popen(check).readlines()
+ phy_int_list[:]=[i.rstrip('\n') for i in phy_int_list]
+ #for i in phy_int_list:
+  #print i
+ print phy_int_list
 
 def file_finder(file_name):
  if ' ' in file_name:
@@ -148,7 +151,7 @@ def check_ospf(file_name):
   if data[i].isspace():
    break
   else:
-    ospf.append(filter(None,data[i].split(' ')))
+   ospf.append(filter(None,data[i].split(' ')))
  header=['Neighbor ID','VRF','Pri','State','Dead Time','Address','Interface']    
  print("\n")
  print tabulate(ospf,headers=header,tablefmt='fancy_grid')
@@ -189,6 +192,7 @@ def check_phy(*args):
     #print data[i]   
     #i=i+1
     print('\nPlease check the PHY details for specific interface by specifying the interface name.\n')
+    phy_int_list(args[0])
     sys.exit(-2)
 def check_int(*args):
  int=[]
@@ -224,7 +228,8 @@ def check_int(*args):
    #while not data[i].isspace():
     #print data[i]
     #i=i+1
-    print('\nPlease check the interface  details for specific interface by specifying the interface name. Eg: analyze.py -i et1/1 showtech.txt. Interface short name will work! \n')
+    print('\nPlease check the interface  details for specific interface by specifying the interface name. Eg: analyze.py -i eth1/1 showtech.txt. Interface short name will work! \n')
+    phy_int_list(args[0])
     sys.exit(-2) 
 
 def check_mlag(file_name):
@@ -262,7 +267,9 @@ def check_mlag(file_name):
  print tabulate(mlag, headers=['Domain-ID', 'Local Interface','Peer-Address','State','Change(s)','Configured Po','Inactive Po','Active-Partial Po','Active-Full Po'],tablefmt='fancy_grid')
  print('\n')
 def check_lldp(file_name):
+ data=read_file(file_name)   
  lldp=[]
+ index=0
  temp=[]
  sname=''
  pid=''
@@ -272,6 +279,16 @@ def check_lldp(file_name):
 #####Need to fix this######
  lldp_int_list.append('Management1')
  for i in lldp_int_list:
+  check='interface '+i  
+  print check
+  regexp = re.compile(check)
+  for j in data:
+   if regexp.search(j):
+    index=data.index(j)+1
+    print 'yes'
+  #for k in range(index,index+10):
+  # if 'description' in data[k]:
+   # print data[k]   
   check='cat '+file_name+'  | grep -e "'+i.strip('\n')+'\s.*LLDP" -A 20'
   data=os.popen(check).readlines()
   for j in data:
