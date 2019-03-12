@@ -8,6 +8,7 @@ from tabulate import tabulate
 parser=argparse.ArgumentParser()
 parser.add_argument("-l","--lldp",nargs="?",help="Check LLDP status")
 parser.add_argument("-m","--mlag",nargs="?",help="Check MLAG status")
+parser.add_argument("-li","--listint",nargs="?",help="Check Physical Interfaces")
 parser.add_argument("-mi","--mlagint",nargs="?",help="Check MLAG Interface status")
 parser.add_argument("-b","--bgp",nargs="?",help="Check BGP status")
 parser.add_argument("-o","--ospf",nargs="?",help="Check OSPF status")
@@ -17,10 +18,15 @@ parser.add_argument("-i","--int",nargs="*",help="Check Interface Details")
 args=parser.parse_args()
 
 def read_file(file_name):
- #print(file_name)    
- with open(file_name) as f:
-  data=f.readlines()
- return data
+ try:
+  if "'" in file_name:
+   file_name=file_name.strip("'")
+  with open(file_name) as f:
+   data=f.readlines()
+   return data
+ except:
+  print(file_name)
+  print('\nSomething went wrong while reading the input file!!!\n')   
 
 #regexp = re.compile('^Port.*Flags$')
 #for i in data:
@@ -31,11 +37,16 @@ def phy_int_list(file_name):
  check='cat '+file_name+'  | egrep Et.*LLDP | cut -d " "  -f2 '
  phy_int_list=os.popen(check).readlines()
  phy_int_list[:]=[i.rstrip('\n') for i in phy_int_list]
+ print('')
  #for i in phy_int_list:
   #print i
  print phy_int_list
 
 def file_finder(file_name):
+ if file_name=='.':
+  with open(os.getenv('HOME')+'/.analyze_file_name.txt') as f:
+    file_name=f.readlines()[0]
+  return file_name
  if ' ' in file_name:
   file_name="'"+file_name+"'"   
  check='ls | grep -v gz | grep -i '+file_name
@@ -46,13 +57,20 @@ def file_finder(file_name):
    print i
   sys.exit(-2)
  else:
-  file_name=file_list[0].strip('\n')
-  if ' ' in file_name:
-   file_name="'"+file_name+"'"
-  return file_name
-
+  try:   
+   file_name=file_list[0].strip('\n')
+   if ' ' in file_name:
+    file_name="'"+file_name+"'"
+   path=os.getenv('HOME')+'/.analyze_file_name.txt'
+   with open(path,'w') as f:
+    f.write(file_name)   
+   return file_name
+  except:
+    print('\nError occured while locating the file: '+file_name+'\n')  
+    sys.exit(-2)
 def check_mlagint(file_name):
  data=read_file(file_name)
+ index=0
  mi=[]
  regexp = re.compile('mlag.*state.*oper.*changes')
  for i in data:
@@ -72,6 +90,7 @@ def check_bgp(file_name):
  data=read_file(file_name)
  bgp=[]
  temp=[]
+ index=0
  index_val=0
  rid=asnum=''
  ######COME UP WITH A BETTER REGEX;figure out why \b(\d+\.)+\d+\b not working########
@@ -97,9 +116,14 @@ def check_bgp(file_name):
      if 'VRF' in data[j]:
       if len(bgp)>0:
        for i in bgp:
-        temp.append(filter(None,i))
+        i=(filter(None,i))
+        if '\n' in i:
+         i.insert(i.index('\n'),0)
+         i.insert(i.index('\n'),0)
+         i.remove('\n')
+        temp.append(i)
       else:
-        print('\nNO BGP NEI for the VRF '+ vrf+'with RID' + rid) 
+       print('\nNO BGP NEI for the VRF '+ vrf+'with RID:' + rid) 
           
       print tabulate(temp, headers=['Neighbor', 'V','AS','MsgRcvd','MsgSent','InQ','OutQ','Up/Down','State' ,'PfxRcd','PfxAcc','VRF','RID'],tablefmt='fancy_grid')
       bgp=[] 
@@ -108,7 +132,12 @@ def check_bgp(file_name):
      if data[j].isspace():
       if len(bgp)>0:
        for i in bgp:
-        temp.append(filter(None,i))
+        i=(filter(None,i))
+        if '\n' in i:
+         i.insert(i.index('\n'),0)
+         i.insert(i.index('\n'),0)
+         i.remove('\n')
+        temp.append(i)
       else:    
        print('NO BGP NEI for the VRF '+ vrf+' with RID' + rid) 
       print tabulate(temp, headers=['Neighbor', 'V','AS','MsgRcvd','MsgSent','InQ','OutQ','Up/Down','State' ,'PfxRcd','PfxAcc','VRF','RID'],tablefmt='fancy_grid')
@@ -142,6 +171,7 @@ def check_ver(file_name):
  
 def check_ospf(file_name):
  ospf=[]
+ index=0
  data=read_file(file_name)
  regexp = re.compile('------------- show ip ospf neighbor -------------')
  for i in data:
@@ -165,7 +195,8 @@ def check_phy(*args):
   data=read_file(args[1])
   flag=1
  else:
-  data=read_file(args[0])   
+  data=read_file(args[0])
+ print data   
  regexp = re.compile('------------- show interfaces phy detail -------------')
  for i in data:
   if regexp.search(i):
@@ -173,13 +204,17 @@ def check_phy(*args):
  for i in range(index,index+2000):
   if flag:
    header='****************************************************************** Phy Details:'+args[0]+' ******************************************************************'   
-   if 'thernet' not in args[0]:
-     value=args[0].replace('t','thernet').capitalize()
-     value=args[0].replace('th','thernet').capitalize()  
+   if 'thernet' not in args[0]: 
+     value=args[0].replace('th','thernet').capitalize() if 'th' in args[0] else args[0].replace('t','thernet').capitalize()
+   else:
+     value=args[0].capitalize()
+    
    regexp = re.compile(value)  
-   if regexp.search(data[i]):
-    #print(data[i])    
+   #if regexp.search(data[i]):
+   if value in data[i]: 
     #phy.append([data[i].strip('\n').strip('\r')])
+    print data[i]
+    sys.exit(-2)
     for i in range(i+1,i+100):
      if 'Ethernet' in data[i]:
       os.system('clear')   
@@ -210,12 +245,12 @@ def check_int(*args):
   if flag:
    header='****************************************************************** Interface Details:'+args[0]+' ******************************************************************'
    if 'thernet' not in args[0]:
-     #value=args[0].replace('t','thernet').capitalize()+' is'
-     value=args[0].replace('th','thernet').capitalize()+' is'
+     value=args[0].replace('th','thernet').capitalize()+' is' if 'th' in args[0] else args[0].replace('t','thernet').capitalize()+' is'
    else:
     value=args[0].capitalize()+' is'   
    regexp = re.compile(value)
-   if regexp.search(data[i]):
+   #if regexp.search(data[i]):
+   if value in data[i]: 
     int.append([data[i].strip('\n').strip('\r')])
     for i in range(i+1,i+100):
      if 'Ethernet'  and 'line protocol' in data[i]:
@@ -266,6 +301,8 @@ def check_mlag(file_name):
  print('\n')
  print tabulate(mlag, headers=['Domain-ID', 'Local Interface','Peer-Address','State','Change(s)','Configured Po','Inactive Po','Active-Partial Po','Active-Full Po'],tablefmt='fancy_grid')
  print('\n')
+
+
 def check_lldp(file_name):
  data=read_file(file_name)   
  lldp=[]
@@ -280,12 +317,10 @@ def check_lldp(file_name):
  lldp_int_list.append('Management1')
  for i in lldp_int_list:
   check='interface '+i  
-  print check
   regexp = re.compile(check)
   for j in data:
    if regexp.search(j):
     index=data.index(j)+1
-    print 'yes'
   #for k in range(index,index+10):
   # if 'description' in data[k]:
    # print data[k]   
@@ -307,7 +342,6 @@ def check_lldp(file_name):
  print('\n')
 
 def main():
- #file=file_finder(args.lldp)   
  if args.lldp:
   file=file_finder(args.lldp)   
   check_lldp(file)
@@ -324,8 +358,15 @@ def main():
   file=file_finder(args.ospf)
   check_ospf(file)  
  if args.version:
-  file=file_finder(args.version)
+  if args.version[0]==".":
+   with open(os.getenv('HOME')+'/.analyze_file_name.txt') as f:
+    file=f.readlines()[0]
+  else:  
+   file=file_finder(args.version)
   check_ver(file)
+ if args.listint:
+  file=file_finder(args.listint)
+  phy_int_list(file)
  if args.phy:
   if len(args.phy) > 1:   
    file=file_finder(args.phy[1])
