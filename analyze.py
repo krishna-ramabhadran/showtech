@@ -6,7 +6,8 @@ import argparse
 from tabulate import tabulate
 
 parser=argparse.ArgumentParser()
-parser.add_argument("-l","--lldp",nargs="?",help="Check LLDP status")
+parser.add_argument("-ll","--lldp",nargs="?",help="Check LLDP status")
+parser.add_argument("-po","--port",nargs="?",help="Check Port-Channel status")
 parser.add_argument("-m","--mlag",nargs="?",help="Check MLAG status")
 parser.add_argument("-li","--listint",nargs="?",help="Check Physical Interfaces")
 parser.add_argument("-mi","--mlagint",nargs="?",help="Check MLAG Interface status")
@@ -14,6 +15,7 @@ parser.add_argument("-b","--bgp",nargs="?",help="Check BGP status")
 parser.add_argument("-o","--ospf",nargs="?",help="Check OSPF status")
 parser.add_argument("-v","--version",nargs="?",help="Check Version")
 parser.add_argument("-p","--phy",nargs="*",help="Check Phy Details")
+parser.add_argument("-l","--log",nargs="?",help="Check buffer logs")
 parser.add_argument("-i","--int",nargs="*",help="Check Interface Details")
 args=parser.parse_args()
 
@@ -43,7 +45,7 @@ def phy_int_list(file_name):
  print phy_int_list
 
 def file_finder(file_name):
- if file_name=='.':
+ if file_name=='.' or file_name=='1':
   with open(os.getenv('HOME')+'/.analyze_file_name.txt') as f:
     file_name=f.readlines()[0]
   return file_name
@@ -187,7 +189,75 @@ def check_ospf(file_name):
  print tabulate(ospf,headers=header,tablefmt='fancy_grid')
  print('\n')
 
+def check_log(file_name):
+ log=[]
+ index=0
+ data=read_file(file_name)
+ regexp = re.compile('Log Buffer:')
+ header='****************************************************************** Log Buffer ******************************************************************'#Something is wrong this header :)
+ for i in data:
+  if regexp.search(i):
+    index=data.index(i)+1
+ while True:
+  if '------------- show interfaces -------------' in data[index]:
+   break
+  else:
+   if data[index]!='': #This didn't fixe the last empty line;check again!  
+    log.append([data[index].strip('\n').strip('\r')])   
+   #print(data[index])   
+  index+=1 
+ header=['Log Buffer']
+# print("\n")
+ print tabulate(log,headers=header,tablefmt='fancy_grid')
+ #print('\n')
 
+def check_port(file_name):
+ po=[]
+ index=0
+ num=0
+ flag=0
+ active=[]
+ inactive=[]
+ detail_act={}
+ detail_inact={}
+ pos=[]
+ data=read_file(file_name)
+ regexp = re.compile('------------- show port-channel detailed all-ports -------------')
+ for i in data:
+  if regexp.search(i):
+    index=data.index(i)+1
+ for i in range(index,index+500): 
+  if 'Port Channel' in data[i]:  
+   if flag!=0:
+    detail_act[num]=active
+    detail_inact[num]=inactive
+   num=data[i].split('Port-Channel')[1].split(' ')[0]
+   po.append(data[i].split('Port-Channel')[1].split(' ')[0])
+   active=[]
+   inactive=[]
+   flag=0
+  if 'active' in data[i]:
+   flag=1  
+  if 'inactive' in data[i]:
+   flag=2   
+  if 'Ethernet' in data[i] and flag==1:
+   active.append(data[i].split()[0])
+  if 'Ethernet' in data[i] and flag==2:
+   inactive.append(data[i].split()[0]) 
+  if "---- show" in data[i]:
+   detail_act[num]=active
+   detail_inact[num]=inactive
+   #print detail_act
+   #print detail_inact
+   break
+ temp=[]  
+ for i in detail_act.keys():  
+  temp.append([i,detail_act[i]])
+ print tabulate(temp,headers=['Po','Active Interfaces'],tablefmt='fancy_grid')
+ temp=[]
+ for i in detail_inact.keys():
+  temp.append([i,detail_inact[i]])
+ print tabulate(temp,headers=['Po','InActive Interfaces'],tablefmt='fancy_grid')
 def check_phy(*args):
  phy=[]
  flag=0
@@ -357,8 +427,14 @@ def main():
  if args.ospf:
   file=file_finder(args.ospf)
   check_ospf(file)  
+ if args.log:
+  file=file_finder(args.log)
+  check_log(file)
+ if args.port:
+  file=file_finder(args.port)
+  check_port(file)
  if args.version:
-  if args.version[0]==".":
+  if args.version[0]=="." or args.version[0]=="1":
    with open(os.getenv('HOME')+'/.analyze_file_name.txt') as f:
     file=f.readlines()[0]
   else:  
